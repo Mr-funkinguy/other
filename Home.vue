@@ -1,422 +1,196 @@
 <template>
   <v-app>
-    <v-content>
-      <v-card style="height: 100%" class="d-flex" v-if="init">
-        <div class="ma-auto" style="width: 750px">
-          <div class="ad mx-auto my-12 d-flex">
-            <div id="kahoot-rocks_728x90">
-              <script type="application/javascript">
-                aiptag.cmd.display.push(function () {
-                  aipDisplayTag.display("kahoot-rocks_728x90");
-                });
-              </script>
-            </div>
-
-            <div id="kahoot-rocks_300x250">
-              <script type="application/javascript">
-                aiptag.cmd.display.push(function () {
-                  aipDisplayTag.display("kahoot-rocks_300x250");
-                });
-              </script>
-            </div>
-          </div>
-
-          <div class="ma-auto pb-12" id="inputs">
-            <v-form class="d-flex align-center pb-5">
-              <v-text-field
-                @keyup.enter="firstJoin"
-                v-model="$kahoot.pin"
-                :rules="numberRules"
-                class="mr-sm-5 mr-1 ml-2"
-                label="Game Pin"
-                hide-details="auto"
-              ></v-text-field>
-              <v-text-field
-                :disabled="this.$globals.options.randomBotNames"
-                @keyup.enter="firstJoin"
-                v-model="username"
-                :rules="usernameRules"
-                class="ml-sm-5 lm-1 mr-2"
-                label="Username"
-                hide-details="auto"
-              ></v-text-field>
-            </v-form>
-            <div class="text-center mb-12 pb-12">
-              <v-btn
-                class="ma-2 white--text"
-                :loading="loading"
-                :disabled="loading"
-                @click="firstJoin()"
-                style="
-                  -webkit-animation: bgcolor 20s infinite;
-                  animation: bgcolor 10s infinite;
-                  -webkit-animation-direction: alternate;
-                  animation-direction: alternate;
-                "
-                >Join Game</v-btn
-              >
-            </div>
-          </div>
-        </div>
-      </v-card>
-
-      <div class="content" v-if="!init">
-        <v-card class="my-6 pb-10 px-6">
-          <div class="d-flex justify-space-between pt-5">
-            <h2 class="white--text">
-              {{ `Current Question: ${currentQuestion}` }}
-            </h2>
-
-            <v-tooltip bottom>
-              <template v-slot:activator="{ on, attrs }">
-                <v-btn
-                  large
-                  icon
-                  v-bind="attrs"
-                  v-on="on"
-                  @click="$kahoot.reset()"
+    <v-overlay :value="$globals.loading">
+      <v-progress-circular indeterminate size="64"></v-progress-circular>
+    </v-overlay>
+    <div v-if="!$globals.loading">
+      <v-app-bar app>
+        <v-app-bar-nav-icon @click="drawer = !drawer"></v-app-bar-nav-icon>
+        <v-toolbar-title v-if="$vuetify.breakpoint.smAndUp"
+          >Kahoot Rocks</v-toolbar-title
+        >
+      </v-app-bar>
+      <v-navigation-drawer v-model="drawer" app temporary>
+        <v-list-item>
+          <v-list-item-content>
+            <v-list-item-title class="text-center display-1"
+              >Kahoot Rocks</v-list-item-title
+            >
+          </v-list-item-content>
+        </v-list-item>
+        <v-divider></v-divider>
+        <v-list flat>
+          <v-list-item-group v-model="menuItem" color="primary">
+            <v-list-item>
+              <v-list-item-icon>
+                <v-icon v-if="menuItem != 0 && menuItem != undefined"
+                  >mdi-home</v-icon
                 >
-                  <v-icon color="red">mdi-exit-to-app</v-icon>
-                </v-btn>
-              </template>
-              <span>Reset</span>
-            </v-tooltip>
-          </div>
-          <div class="d-flex justify-space-between mb-4">
-            <div v-if="editingName" class="d-flex justify-space-between">
-              <h2>
-                {{
-                  `Quiz ${
-                    /[a-z0-9]{8}-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{12}/gi.test(
-                      this.$searcher.quizName
-                    )
-                      ? "uuid"
-                      : this.$searcher.quizName == ""
-                      ? "name/uuid"
-                      : "name"
-                  }:`
-                }}
-              </h2>
-              <v-text-field
-                label=""
-                ref="editNameField"
-                class="pt-0 ml-2"
-                @keyup.enter="editingName = false"
-                @keyup.esc="editingName = false"
-                v-model="editedName"
-                style="width: 25vw"
-              ></v-text-field>
-              <v-icon @click="editingName = false" class="mb-2 ml-2"
-                >mdi-check</v-icon
-              >
-            </div>
-            <div v-if="!editingName" class="d-flex justify-space-between">
-              <h2 v-html="getNameHtml()"></h2>
-              <v-icon
-                v-if="!$kahoot.manuallySearched"
-                @click="editName()"
-                :class="`ml-2 ${
-                  $kahoot.quizNameRequired &&
-                  $searcher.quizName === '' &&
-                  !$kahoot.kahootStarted
-                    ? 'red--text'
-                    : ''
-                }`"
-                >mdi-pencil</v-icon
-              >
-            </div>
-          </div>
-          <v-row no-gutters class="text-center">
-            <v-row no-gutters class="text-center">
-              <v-col class="d-flex flex-column">
-                <v-row no-gutters class="text-center">
-                  <v-text-field
-                    autocomplete="off"
-                    v-model="$globals.options.minAnswerDelay"
-                    :rules="minAnswerDelayRules"
-                    @blur="validateDelay(1)"
-                    :class="`mr-${innerWidth > 459 ? '6' : '0'}`"
-                    label="Answer delay min (ms)"
-                    hide-details="auto"
-                  ></v-text-field>
-                </v-row>
-              </v-col>
-            </v-row>
-            <v-row no-gutters class="text-center">
-              <v-col class="d-flex flex-column">
-                <v-row no-gutters class="text-center">
-                  <v-text-field
-                    autocomplete="off"
-                    v-model="$globals.options.maxAnswerDelay"
-                    :rules="maxAnswerDelayRules"
-                    @blur="validateDelay(2)"
-                    label="Answer delay max (ms)"
-                    hide-details="auto"
-                  ></v-text-field>
-                </v-row>
-              </v-col>
-            </v-row>
-          </v-row>
-          <v-row no-gutters class="text-center">
-            <v-col class="d-flex flex-column">
-              <v-row no-gutters class="text-center">
-                <v-text-field
-                  v-model="$globals.options.answerCorrect"
-                  :rules="numberRules"
-                  label="Answer correct"
-                  hide-details="auto"
-                  append-icon="mdi-percent-outline"
-                ></v-text-field>
-              </v-row>
-            </v-col>
-          </v-row>
-        </v-card>
-        <v-data-table
-          :hide-default-footer="true"
-          :disable-filtering="true"
-          :items-per-page="tableItems.length"
-          :headers="tableHeaders"
-          :items="tableItems"
-          class="elevation-1"
-        ></v-data-table>
-        <div class="ad mx-auto my-12 d-flex">
-          <div id="kahoot-rocks_728x90">
-            <script type="application/javascript">
-              aiptag.cmd.display.push(function () {
-                aipDisplayTag.display("kahoot-rocks_728x90");
-              });
-            </script>
-          </div>
-
-          <div id="kahoot-rocks_300x250">
-            <script type="application/javascript">
-              aiptag.cmd.display.push(function () {
-                aipDisplayTag.display("kahoot-rocks_300x250");
-              });
-            </script>
-          </div>
+                <v-icon
+                  v-if="menuItem == 0 || menuItem == undefined"
+                  color="primary"
+                  >mdi-home</v-icon
+                >
+              </v-list-item-icon>
+              <v-list-item-content>
+                <v-list-item-title v-if="menuItem != 0 && menuItem != undefined"
+                  >Home</v-list-item-title
+                >
+                <v-list-item-title
+                  v-if="menuItem == 0 || menuItem == undefined"
+                  class="blue--text"
+                  >Home</v-list-item-title
+                >
+              </v-list-item-content>
+            </v-list-item>
+            <v-list-item v-for="(item, i) in menuItems" :key="i">
+              <v-list-item-icon>
+                <v-icon v-text="item.icon"></v-icon>
+              </v-list-item-icon>
+              <v-list-item-content>
+                <v-list-item-title v-text="item.text"></v-list-item-title>
+              </v-list-item-content>
+            </v-list-item>
+            <v-list-item @click="DiscordClicked()">
+              <v-list-item-icon>
+                <v-icon>mdi-discord</v-icon>
+              </v-list-item-icon>
+              <v-list-item-content>
+                <v-list-item-title
+                  :class="`${this.menuItem == 8 ? 'blue--text' : ''}`"
+                  >Discord Server</v-list-item-title
+                >
+              </v-list-item-content>
+            </v-list-item>
+          </v-list-item-group>
+        </v-list>
+        <div
+          id="kahoot-rocks_300x250"
+          style="transform: scale(0.9)"
+          class="ma-0 pa-0"
+        >
+          <script type="application/javascript">
+            aiptag.cmd.display.push(function() {
+              aipDisplayTag.display("kahoot-rocks_300x250");
+            });
+          </script>
         </div>
-        <addBotsBtn></addBotsBtn>
-      </div>
-    </v-content>
+      </v-navigation-drawer>
+
+      <alert></alert>
+      <teamMembers></teamMembers>
+      <kahootName></kahootName>
+      <kahootPuzzle></kahootPuzzle>
+      <challengeNewName></challengeNewName>
+      <challengePopoutImage></challengePopoutImage>
+      <homePage v-if="menuItem == 0 || menuItem == undefined"></homePage>
+      <challengePage v-if="menuItem == 1"></challengePage>
+      <settingsPage v-if="menuItem == 2"></settingsPage>
+      <infoPage v-if="menuItem == 3"></infoPage>
+      <legalPage v-if="menuItem == 4"></legalPage>
+    </div>
   </v-app>
 </template>
 
 <script>
-module.exports = {
+export default {
   name: "Home",
   components: {
-    addBotsBtn: () => import("../AddBotsBtn"),
+    homePage: () => import("../components/Tabs/Home"),
+    challengePage: () => import("../components/Tabs/Challenge"),
+    settingsPage: () => import("../components/Tabs/Settings"),
+    infoPage: () => import("../components/Tabs/Info"),
+    legalPage: () => import("../components/Tabs/Legal"),
+    alert: () => import("../components/Alert"),
+    teamMembers: () => import("../components/TeamMembers"),
+    kahootName: () => import("../components/KahootName"),
+    kahootPuzzle: () => import("../components/KahootPuzzle"),
+    challengeNewName: () => import("../components/ChallengeNewName"),
+    challengePopoutImage: () => import("../components/PopoutImage")
   },
   data: () => {
     return {
-      username: "",
-      usernameRules: [
-        (value) => !!value || "Required.",
-        (value) => {
-          let regex = /[^.[\]]+|\[(?:(-?\d+(?:\.\d+)?)|(["'])((?:(?!\2)[^\\]|\\.)*?)\2)\]|(?=(?:\.|\[\])(?:\.|\[\]|$))/g;
-          return regex.test(value) || "Cannot contain special characters";
+      menuItems: [
+        {
+          text: "Challenge",
+          icon: "mdi-bullseye-arrow"
         },
+        { text: "Settings", icon: "mdi-settings" },
+        { text: "FAQ", icon: "mdi-forum" },
+        { text: "Legal", icon: "mdi-file-document-outline" }
       ],
-      numberRules: [
-        (value) => {
-          let regex = /^[0-9]*$/gm;
-          return (
-            regex.test(value) ||
-            (value == "" || value == null ? true : "Has to be a number")
-          );
-        },
-      ],
-      editingName: false,
-      editedName: "",
-      minAnswerDelayRules: [true],
-      maxAnswerDelayRules: [true],
-      tableHeaders: [
-        { text: "Name", align: "start", sortable: false, value: "name" },
-        { text: "Rank", value: "rank" },
-        { text: "Points", value: "points" },
-      ],
+      dropdownItems: ["Logout"],
+      drawer: null,
+      errored: false
     };
   },
   computed: {
-    init() {
-      return this.$kahoot.players.length == 0;
+    userEmail() {
+      return this.$globals.user.email;
     },
-    loading: {
+    menuItem: {
       get() {
-        return this.$globals.loading;
+        return this.$globals.menuItem;
       },
       set(value) {
-        this.$globals.loading = value;
-      },
-    },
-    innerWidth() {
-      return window.innerWidth;
-    },
-    quizStarted: function () {
-      return this.$kahoot.kahootStarted;
-    },
-    currentQuestion: function () {
-      if (!this.$kahoot.kahootStarted) {
-        return "Kahoot not started";
-      } else {
-        if (this.$searcher.kahoots.length == 0) return "No Kahoots found";
-        if (
-          this.$searcher.kahoots[0].questions[this.$kahoot.questionIndex]
-            .type == "content"
-        )
-          return "Content";
-        return this.$searcher.kahoots[0].questions[
-          this.$kahoot.questionIndex
-        ].text
-          .replace(/(&([a-z0-9]+|#[0-9]{1,6}|#x[0-9a-f]{1,6});)+/gi, " ")
-          .replace(/<[^>]*>/g, " ")
-          .replace("  ", " ");
+        this.$globals.menuItem = value;
       }
-    },
-    tableItems: function () {
-      let items = [];
-      this.$kahoot.players.forEach((player, index) => {
-        items.push({
-          name: player.username,
-          rank: player.rank,
-          points: player.points,
-          index: index + 1,
-        });
-      });
-      return items;
-    },
+    }
   },
   watch: {
-    editingName() {
-      if (!this.editingName && this.editedName !== this.$searcher.quizName) {
-        this.$searcher.quizName = this.editedName;
-      }
-    },
+    menuItem() {
+      if (this.menuItem == 5) this.menuItem = 0;
+      if (this.$globals.options.closeDrawerOnClick) this.drawer = false;
+    }
   },
   methods: {
-    getNameHtml() {
-      return `Quiz ${
-        /[a-z0-9]{8}-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{12}/gi.test(
-          this.$searcher.quizName
-        )
-          ? "uuid"
-          : this.$searcher.quizName == ""
-          ? "name/uuid"
-          : "name"
-      }: ${this.formatQuizName(this.$searcher.quizName)}`;
-    },
-    formatQuizName(quizName) {
-      if (
-        this.$kahoot.quizNameRequired &&
-        quizName === "" &&
-        !this.$kahoot.kahootStarted
-      )
-        return `<span class="red--text">Not specified</span>`;
-      if (quizName === "") return "Not specified";
-      return quizName;
-    },
-    editName() {
-      this.editedName = this.$searcher.quizName;
-      this.editingName = true;
-      setTimeout(() => {
-        this.$refs.editNameField.focus();
-      }, 1);
-    },
-    validateDelay(type) {
-      let regex = /^[0-9]*$/gm;
-      this.minAnswerDelayRules = [true];
-      this.maxAnswerDelayRules = [true];
-
-      switch (type) {
-        case 1:
-          if (!regex.test(this.$globals.options.minAnswerDelay))
-            return (this.minAnswerDelayRules = ["Has to be a number"]);
-
-          if (
-            Number(this.$globals.options.minAnswerDelay) >
-            Number(this.$globals.options.maxAnswerDelay)
-          ) {
-            return (this.minAnswerDelayRules = [
-              "Cannot be larger than max delay",
-            ]);
-          }
-          break;
-        case 2:
-          if (!regex.test(this.$globals.options.maxAnswerDelay))
-            return (this.maxAnswerDelayRules = ["Has to be a number"]);
-
-          if (
-            Number(this.$globals.options.maxAnswerDelay) <
-            Number(this.$globals.options.minAnswerDelay)
-          ) {
-            return (this.maxAnswerDelayRules = [
-              "Cannot be smaller than min delay",
-            ]);
-          }
-          break;
-      }
-    },
-    Error(msg) {
-      this.someError = true;
-      this.errorMessage = msg;
-
-      setTimeout(() => {
-        this.someError = false;
-      }, 3000);
-    },
-    async firstJoin() {
-      this.$globals.loading = true;
-      this.$globals.cancelNotify();
-      if (this.$kahoot.pin == "") {
-        return this.$globals.notify("Pin cannot be empty", "ERROR");
-      }
-      if (!this.$globals.options.randomBotNames && this.username == "") {
-        return this.$globals.notify("Username cannot be empty", "ERROR");
-      }
-      if (
-        !this.$globals.options.randomBotNames &&
-        !/[^.[\]]+|\[(?:(-?\d+(?:\.\d+)?)|(["'])((?:(?!\2)[^\\]|\\.)*?)\2)\]|(?=(?:\.|\[\])(?:\.|\[\]|$))/g.test(
-          this.username
-        )
-      ) {
-        return this.$globals.notify("Username invalid", "ERROR");
-      }
-      if (!/^[0-9]*$/gm.test(this.$kahoot.pin)) {
-        return this.$globals.notify("Pin must be a number", "ERROR");
-      }
-
-      this.$kahoot.createBotClient(1, this.username);
-    },
+    DiscordClicked() {
+      this.menuItem = 0;
+      window.open("https://discord.gg/qyZ5cCn", "_blank");
+    }
   },
+  mounted() {
+    this.$globals.loading = false;
+  }
 };
 </script>
 
 <style scoped>
-@media only screen and (max-width: 850px) {
-  .content {
-    margin-top: 4px;
-    margin: 10px;
-  }
+.ghost {
+  opacity: 0.5;
+  background: #c8ebfb;
 }
-#kahoot-rocks_728x90,
-#kahoot-rocks_300x250 {
-  margin: auto;
+
+.list-group-item {
+  border-width: 2px;
+  border-style: solid;
+  border-radius: 10px;
 }
-@media only screen and (max-width: 850px) {
-  #kahoot-rocks_300x250 {
-    display: unset;
-  }
-  #kahoot-rocks_728x90 {
-    display: none;
-  }
+
+#red-draggable,
+#blue-draggable,
+#yellow-draggable,
+#green-draggable {
+  cursor: grab;
 }
-@media only screen and (min-width: 850px) {
-  #kahoot-rocks_300x250 {
-    display: none;
-  }
-  #kahoot-rocks_728x90 {
-    display: unset;
-  }
+
+#red-draggable {
+  border-color: #e21b3c;
+  color: #e21b3c;
+}
+
+#blue-draggable {
+  border-color: #1368ce;
+  color: #1368ce;
+}
+
+#yellow-draggable {
+  border-color: #d89e00;
+  color: #d89e00;
+}
+
+#green-draggable {
+  border-color: #26890c;
+  color: #26890c;
 }
 </style>
